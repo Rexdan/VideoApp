@@ -55,7 +55,7 @@ public class UploadViewController extends Thread
 	private static int length = 1;
 	private int offSet = 0;
 	private int currentRead = 0;
-	private static ReentrantLock outputStreamLock, inputStreamLock, offSetLock;
+	private static ReentrantLock outputStreamLock, inputStreamLock, offSetLock, ftpConnectLock;
 	final Stage dialog = new Stage();
 	private boolean closedInput;
 	private boolean closedOutput;
@@ -239,8 +239,6 @@ public class UploadViewController extends Thread
 		for(int i = 0; i < droppedItems.size(); i++)
 		{
 			startWorker(droppedItems.get(i), progressBar);
-			//long threadId = Thread.currentThread().getId();
-            //System.out.println("Thread # " + threadId + " is doing this task");
 		}
 	}
 	
@@ -281,62 +279,50 @@ public class UploadViewController extends Thread
 		//dialog.close();
 	}
 	
-	public void runTask(Object droppedItem, ProgressBar progressBar) throws Exception
+	public synchronized void runTask(Object droppedItem, ProgressBar progressBar) throws Exception
 	{
+		
 		Main.getClient().changeWorkingDirectory(Main.booksPath);   
     	Book book = (Book)droppedItem;
     	File file = new File(book.getBookPath());
     	FileInputStream inputStream = new FileInputStream(file);
+    	System.out.println("To upload: " + droppedItem.toString().concat(".pdf"));
+    	/*if(Platform.isFxApplicationThread()) System.out.println("Java FX Application Thread.");
+		else System.out.println("Not a Java FX Application Thread.");
+		long threadId = Thread.currentThread().getId();
+		System.out.println("Thread # " + threadId + " is doing this task");*/
+    	System.out.println(Main.getClient().getStatus());
     	OutputStream outputStream = Main.getClient().storeFileStream(droppedItem.toString().concat(".pdf"));
-    	
+    	//System.out.println(Main.getClient().getStatus());
+
     	byte[] bytesIn = new byte[(int) file.length()];
     	length = bytesIn.length;
     	read = 0;
     	
-    	//if(Platform.isFxApplicationThread()) System.out.println("Java FX Application Thread.");
-		//else System.out.println("Not a Java FX Application Thread.");
-    	//long threadId = Thread.currentThread().getId();
-        //System.out.println("Thread # " + threadId + " is doing this task");
-    	
-    	int toRead = length;
-    	
-    	byte [] bytes = new byte[1024];
+    	byte [] bytes = new byte[10240];
     	
     	while ((read = inputStream.read(bytes)) != -1)
     	{
-    		offSetLock.lock();
-    		offSet = length - toRead;
-    		toRead -= 1024;
     		currentRead += read;
-    		System.out.println("The file size: " + length + " Our pos in the fd: " + currentRead + " Our offset: " + offSet + " Our read: " + read);
-    		offSetLock.unlock();
-    		/* We will have the progress bar loaded with an indeterminate amount.
-    		 * I had to admit defeat here. Could not for the life of me get the 
-    		 * written amount set into the progress bar without it hanging.
-    		 * The previous method of tackling this problem wasn't using a real-time
-    		 * amount--THIS IS WHAT YOU NEED TO MAKE THIS WORK.*/
-    		//System.out.println(read + " " + length + " " + offSet);
+    		//System.out.println("The file size: " + length + " Our pos in the fd: " + currentRead + " Our offset: " + offSet + " Our read: " + read);
     		Platform.runLater(new Runnable(){
 
     			@Override
     			public void run()
     			{
-    				//System.out.println((double)currentRead/length);
-    				//long threadId = Thread.currentThread().getId();
-    		        //System.out.println("Thread # " + threadId + " is doing this task");
-    				//progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
     				progressBar.setProgress((double)currentRead/length);
     			}});
-    		outputStream.write(bytesIn, offSet, read);
+    		outputStream.write(bytes, 0, read);
     		outputStream.flush();
     	}
     	
     	closeInputStream(inputStream);
     	closeOutputStream(outputStream);
     	
+    	
     	/* Closing the dialog box after successful writing.
     	 * Must be done this way because dialog is in a JavaFX Application Thread.*/
-    	if(outputStreamClosed())
+    	/*if(outputStreamClosed())
     	{
     		Platform.runLater(new Runnable(){
 
@@ -345,16 +331,14 @@ public class UploadViewController extends Thread
 				{
 					dialog.close();
 				}});
-    	}
+    	}*/
 	}
 	
 	/*The stream functions below may be implemented later for multiple files...*/
-	public void closeOutputStream(OutputStream outputStream) throws IOException 
+	public synchronized void closeOutputStream(OutputStream outputStream) throws IOException 
 	{
 		outputStream.close();
-		outputStreamLock.lock();
 	    closedOutput = true;
-	    outputStreamLock.unlock();
 	}
 	
 	public boolean outputStreamClosed()
@@ -362,12 +346,10 @@ public class UploadViewController extends Thread
 		return closedOutput;
 	}
 	
-	public void closeInputStream(InputStream inputStream) throws IOException 
+	public synchronized void closeInputStream(InputStream inputStream) throws IOException 
 	{
 		inputStream.close();
-		inputStreamLock.lock();
 		closedInput = true;
-		inputStreamLock.unlock();
 	}
 	
 	public boolean inputStreamClosed()
@@ -399,5 +381,6 @@ public class UploadViewController extends Thread
         outputStreamLock = new ReentrantLock();
         inputStreamLock = new ReentrantLock();
         offSetLock = new ReentrantLock();
+        ftpConnectLock = new ReentrantLock();
 	}
 }
