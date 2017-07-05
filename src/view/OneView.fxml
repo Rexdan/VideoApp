@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.text.Font?>
+
+<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="489.0" prefWidth="600.0" 
+xmlns="http://javafx.com/javafx/8.0.111" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.OneViewController">
+   <children>
+      <ListView fx:id="listView" layoutY="71.0" onMouseClicked="#setOnMouseClicked" prefHeight="365.0" prefWidth="600.0" />
+      <Label fx:id="selectionTitle" layoutX="218.0" layoutY="8.0" text="Select a Movie">
+         <font>
+            <Font name="System Bold" size="24.0" />
+         </font>
+      </Label>
+      <Button fx:id="goBack" layoutX="29.0" layoutY="449.0" mnemonicParsing="false" onAction="#goBackToCategories" text="Go Back" />
+      <Label fx:id="description" layoutX="224.0" layoutY="43.0" text="(Double Click To Play Movie)" />
+   </children>
+</AnchorPane>
