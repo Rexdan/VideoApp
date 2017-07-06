@@ -34,6 +34,7 @@ import model.Book;
 import model.Movie;
 import model.Show;
 import model.Song;
+import model.Video;
 import utility.Stages;
 import utility.StringMod;
 
@@ -48,6 +49,7 @@ public class UploadViewController extends Thread
 	private ArrayList<Show> droppedShows;
 	private ArrayList<Song> droppedSongs;
 	private ArrayList<Book> droppedBooks;
+	private ArrayList<Object> droppedItems;
 	
 	private String mediaType;
 	
@@ -59,6 +61,7 @@ public class UploadViewController extends Thread
 	final Stage dialog = new Stage();
 	private boolean closedInput;
 	private boolean closedOutput;
+	private int uploading = 0;
 	
 	private static Stage stage;
 	Task<Void> task;
@@ -199,7 +202,7 @@ public class UploadViewController extends Thread
 	@FXML
 	private void uploadClicked() throws Exception
 	{	
-		ArrayList<Object> droppedItems = new ArrayList<Object>();
+		droppedItems = new ArrayList<Object>();
 		
 		if(!droppedBooks.isEmpty())
 		{
@@ -223,14 +226,18 @@ public class UploadViewController extends Thread
 		
 		dialog.initModality(Modality.NONE);
 		dialog.initOwner(stage);
+		dialog.setTitle("Upload Progress");
 		VBox dialogVbox = new VBox(20);
 		Scene dialogScene = new Scene(dialogVbox, 300, 200);
-		final Label label = new Label("Upload Progress");
-		final ProgressBar progressBar = new ProgressBar(0);
+		final Label totalUploadLabel = new Label("Total Upload Progress");
+		final ProgressBar totalUploadProgressBar = new ProgressBar(0);
+		/*Need at least the first one...*/
+		final Label currentUploadLabel = new Label("Current Upload Progress For: " + droppedItems.get(0).toString());
+		final ProgressBar currentUploadProgressBar = new ProgressBar(0);
 		
 		dialogVbox.setSpacing(5);
 		dialogVbox.setAlignment(Pos.CENTER);
-		dialogVbox.getChildren().addAll(label, progressBar);
+		dialogVbox.getChildren().addAll(totalUploadLabel, totalUploadProgressBar, currentUploadLabel, currentUploadProgressBar);
 		dialog.setScene(dialogScene);
 		dialog.show();
 		
@@ -238,16 +245,17 @@ public class UploadViewController extends Thread
 		
 		for(int i = 0; i < droppedItems.size(); i++)
 		{
-			startWorker(droppedItems.get(i), progressBar);
+			startWorker(droppedItems.get(i), totalUploadProgressBar, currentUploadProgressBar, currentUploadLabel);
 		}
 	}
 	
-	public void startWorker(Object droppedItem, ProgressBar progressBar) throws InterruptedException
+	public void startWorker(Object droppedItem, ProgressBar totalUploadProgressBar, ProgressBar currentUploadProgressBar, Label currentUploadLabel) throws InterruptedException
 	{
 		//if(Platform.isFxApplicationThread()) System.out.println("Java FX Application Thread.");
 		//else System.out.println("Not a Java FX Application Thread.");
     	//long threadId = Thread.currentThread().getId();
         //System.out.println("Thread # " + threadId + " is doing this task");
+		
 		outputStreamLock.lock();
 		closedOutput = false;
 		outputStreamLock.unlock();
@@ -261,7 +269,7 @@ public class UploadViewController extends Thread
 			{
 				try
 				{
-					runTask(droppedItem, progressBar);
+					runTask(droppedItem, totalUploadProgressBar, currentUploadProgressBar, currentUploadLabel);
 				} catch (Exception e)
 				{
 					// TODO Auto-generated catch block
@@ -276,41 +284,71 @@ public class UploadViewController extends Thread
 		backgroundThread.setDaemon(true);
 		/*Start it...*/
 		backgroundThread.start();
-		//dialog.close();
 	}
 	
-	public synchronized void runTask(Object droppedItem, ProgressBar progressBar) throws Exception
+	public synchronized void runTask(Object droppedItem, ProgressBar totalUploadProgressBar, ProgressBar currentUploadProgressBar, Label currentUploadLabel) throws Exception
 	{
+		uploading++;
+		File file = null;
 		
-		Main.getClient().changeWorkingDirectory(Main.booksPath);   
-    	Book book = (Book)droppedItem;
-    	File file = new File(book.getBookPath());
+		if(droppedItem instanceof Book)
+		{
+			Main.getClient().changeWorkingDirectory(Main.booksPath);   
+	    	Book book = (Book)droppedItem;
+	    	file = new File(book.getBookPath());
+		}
+		
+		if(droppedItem instanceof Video)
+		{
+			Video video = (Video)droppedItem;
+			if(video instanceof Movie)
+				Main.getClient().changeWorkingDirectory(Main.moviesPath);
+			else
+				Main.getClient().changeWorkingDirectory(Main.showsPath);
+	    	file = new File(video.getVideoPath());
+		}
+
     	FileInputStream inputStream = new FileInputStream(file);
-    	System.out.println("To upload: " + droppedItem.toString().concat(".pdf"));
+    	/*The call below is for something to consider in the future--it allows for simultaneous file uploads.*/
+    	//Main.getClient().storeFile(file.getName(), inputStream);
+    	
     	/*if(Platform.isFxApplicationThread()) System.out.println("Java FX Application Thread.");
 		else System.out.println("Not a Java FX Application Thread.");
 		long threadId = Thread.currentThread().getId();
 		System.out.println("Thread # " + threadId + " is doing this task");*/
-    	System.out.println(Main.getClient().getStatus());
+
     	OutputStream outputStream = Main.getClient().storeFileStream(droppedItem.toString().concat(".pdf"));
-    	//System.out.println(Main.getClient().getStatus());
 
     	byte[] bytesIn = new byte[(int) file.length()];
     	length = bytesIn.length;
     	read = 0;
     	
-    	byte [] bytes = new byte[10240];
+    	byte [] bytes = new byte[1024];
     	
     	while ((read = inputStream.read(bytes)) != -1)
     	{
     		currentRead += read;
     		//System.out.println("The file size: " + length + " Our pos in the fd: " + currentRead + " Our offset: " + offSet + " Our read: " + read);
     		Platform.runLater(new Runnable(){
-
+    			private volatile boolean shutdown;
+    			
+    			public void shutdown()
+    			{
+    				shutdown = true;
+    			}
+    			
     			@Override
     			public void run()
     			{
-    				progressBar.setProgress((double)currentRead/length);
+    				while(!shutdown)
+    				{
+    					/*get the TOTAL progress...*/
+	    				currentUploadLabel.setText(droppedItem.toString());
+	    				totalUploadProgressBar.setProgress((double)uploading/droppedItems.size());
+	    				currentUploadProgressBar.setProgress((double)currentRead/length);
+	    				shutdown();
+    				}
+    				
     			}});
     		outputStream.write(bytes, 0, read);
     		outputStream.flush();
@@ -318,11 +356,12 @@ public class UploadViewController extends Thread
     	
     	closeInputStream(inputStream);
     	closeOutputStream(outputStream);
-    	
+    	/*This is so that we may call storeFileStream again.*/
+    	Main.getClient().completePendingCommand();
     	
     	/* Closing the dialog box after successful writing.
     	 * Must be done this way because dialog is in a JavaFX Application Thread.*/
-    	/*if(outputStreamClosed())
+    	if(outputStreamClosed() && uploading == droppedItems.size())
     	{
     		Platform.runLater(new Runnable(){
 
@@ -331,7 +370,7 @@ public class UploadViewController extends Thread
 				{
 					dialog.close();
 				}});
-    	}*/
+    	}
 	}
 	
 	/*The stream functions below may be implemented later for multiple files...*/
@@ -380,7 +419,7 @@ public class UploadViewController extends Thread
         droppedBooks = new ArrayList<Book>();
         outputStreamLock = new ReentrantLock();
         inputStreamLock = new ReentrantLock();
-        offSetLock = new ReentrantLock();
-        ftpConnectLock = new ReentrantLock();
+        //offSetLock = new ReentrantLock();
+        //ftpConnectLock = new ReentrantLock();
 	}
 }
