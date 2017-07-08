@@ -6,11 +6,12 @@
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="540.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.111" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.UploadViewController">
+<AnchorPane fx:id="anchorPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="540.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.111" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.UploadViewController">
    <children>
       <SplitPane dividerPositions="0.29797979797979796" layoutY="70.0" prefHeight="400.0" prefWidth="600.0">
         <items>
@@ -21,7 +22,13 @@
             </AnchorPane>
           <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="160.0" prefWidth="100.0">
                <children>
-                  <ListView fx:id="droppedList" layoutX="123.0" layoutY="65.0" onDragDropped="#draggedFile" onDragOver="#draggingFile" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                  <ListView fx:id="droppedList" layoutX="123.0" layoutY="65.0" onDragDropped="#draggedFile" onDragOver="#draggingFile" prefHeight="231.0" prefWidth="417.0" AnchorPane.bottomAnchor="229.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                  <Label layoutX="146.0" layoutY="172.0" text="Files Uploaded">
+                     <font>
+                        <Font name="System Bold" size="18.0" />
+                     </font>
+                  </Label>
+                  <ListView fx:id="uploadedList" layoutX="98.0" layoutY="199.0" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="199.0" />
                </children>
             </AnchorPane>
         </items>
@@ -48,5 +55,9 @@
         </menus>
       </MenuBar>
       <Button fx:id="upload" layoutX="534.0" layoutY="493.0" mnemonicParsing="false" onAction="#uploadClicked" text="Upload" AnchorPane.rightAnchor="29.0" />
+      <Label fx:id="currentUploadLabel" layoutX="258.0" layoutY="470.0" text="Current Upload Progress" />
+      <ProgressBar fx:id="currentUploadProgressBar" layoutX="223.0" layoutY="488.0" prefHeight="10.0" prefWidth="200.0" progress="0.0" />
+      <Label fx:id="totalUploadLabel" layoutX="264.0" layoutY="504.0" text="Total Upload Progress" />
+      <ProgressBar fx:id="totalUploadProgressBar" layoutX="223.0" layoutY="521.0" prefHeight="10.0" prefWidth="200.0" progress="0.0" />
    </children>
 </AnchorPane>

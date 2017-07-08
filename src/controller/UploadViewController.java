@@ -17,8 +17,8 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
-import javafx.scene.Scene;
+//import javafx.geometry.Pos;
+//import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -27,8 +27,10 @@ import javafx.scene.input.DragEvent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.TransferMode;
-import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Region;
+//import javafx.scene.layout.VBox;
+//import javafx.stage.Modality;
 import javafx.stage.Stage;
 import model.Book;
 import model.Movie;
@@ -58,25 +60,28 @@ public class UploadViewController extends Thread
 	private int offSet = 0;
 	private int currentRead = 0;
 	private static ReentrantLock outputStreamLock, inputStreamLock, offSetLock, ftpConnectLock;
-	final Stage dialog = new Stage();
+	//final Stage dialog = new Stage();
 	private boolean closedInput;
 	private boolean closedOutput;
 	private int uploading = 0;
 	
 	private static Stage stage;
 	Task<Void> task;
+	
+	@FXML
+	private AnchorPane anchorPane;
 
 	@FXML
-	private Button upload;
+	private Button upload, goBack;
 	
 	@FXML
-	private Button goBack;
+	private ListView<String> mediaList, droppedList, uploadedList;
 	
 	@FXML
-	private ListView<String> mediaList;
+	private Label currentUploadLabel, totalUploadLabel;
 	
 	@FXML
-	private ListView<String> droppedList;
+	private ProgressBar totalUploadProgressBar, currentUploadProgressBar;
 	
 	@FXML
 	private void goBackToMain() throws IOException
@@ -224,14 +229,14 @@ public class UploadViewController extends Thread
 			for(int i = 0 ; i < droppedShows.size(); i++) droppedItems.add(droppedShows.get(i));
 		}
 		
-		dialog.initModality(Modality.NONE);
+		/*dialog.initModality(Modality.NONE);
 		dialog.initOwner(stage);
 		dialog.setTitle("Upload Progress");
 		VBox dialogVbox = new VBox(20);
 		Scene dialogScene = new Scene(dialogVbox, 300, 200);
 		final Label totalUploadLabel = new Label("Total Upload Progress");
 		final ProgressBar totalUploadProgressBar = new ProgressBar(0);
-		/*Need at least the first one...*/
+		
 		final Label currentUploadLabel = new Label("Current Upload Progress For: " + droppedItems.get(0).toString());
 		final ProgressBar currentUploadProgressBar = new ProgressBar(0);
 		
@@ -239,17 +244,23 @@ public class UploadViewController extends Thread
 		dialogVbox.setAlignment(Pos.CENTER);
 		dialogVbox.getChildren().addAll(totalUploadLabel, totalUploadProgressBar, currentUploadLabel, currentUploadProgressBar);
 		dialog.setScene(dialogScene);
-		dialog.show();
+		dialog.show();*/
 		
 		/*Starting up the workers. Will create both JavaFX Application Threads and Background Daemon Threads.*/
 		
+		if(droppedItems.size() > 1)
+		{
+			totalUploadLabel.setVisible(true);
+			totalUploadProgressBar.setVisible(true);
+		}
+		
 		for(int i = 0; i < droppedItems.size(); i++)
 		{
-			startWorker(droppedItems.get(i), totalUploadProgressBar, currentUploadProgressBar, currentUploadLabel);
+			startWorker(droppedItems.get(i)/*, totalUploadProgressBar, currentUploadProgressBar, currentUploadLabel*/);
 		}
 	}
 	
-	public void startWorker(Object droppedItem, ProgressBar totalUploadProgressBar, ProgressBar currentUploadProgressBar, Label currentUploadLabel) throws InterruptedException
+	public void startWorker(Object droppedItem/*, ProgressBar totalUploadProgressBar, ProgressBar currentUploadProgressBar, Label currentUploadLabel*/) throws InterruptedException
 	{
 		//if(Platform.isFxApplicationThread()) System.out.println("Java FX Application Thread.");
 		//else System.out.println("Not a Java FX Application Thread.");
@@ -269,7 +280,7 @@ public class UploadViewController extends Thread
 			{
 				try
 				{
-					runTask(droppedItem, totalUploadProgressBar, currentUploadProgressBar, currentUploadLabel);
+					runTask(droppedItem/*, totalUploadProgressBar, currentUploadProgressBar, currentUploadLabel*/);
 				} catch (Exception e)
 				{
 					// TODO Auto-generated catch block
@@ -286,16 +297,18 @@ public class UploadViewController extends Thread
 		backgroundThread.start();
 	}
 	
-	public synchronized void runTask(Object droppedItem, ProgressBar totalUploadProgressBar, ProgressBar currentUploadProgressBar, Label currentUploadLabel) throws Exception
+	public synchronized void runTask(Object droppedItem/*, ProgressBar totalUploadProgressBar, ProgressBar currentUploadProgressBar, Label currentUploadLabel*/) throws Exception
 	{
 		uploading++;
 		File file = null;
+		OutputStream outputStream = null;
 		
 		if(droppedItem instanceof Book)
 		{
 			Main.getClient().changeWorkingDirectory(Main.booksPath);   
 	    	Book book = (Book)droppedItem;
 	    	file = new File(book.getBookPath());
+	    	outputStream = Main.getClient().storeFileStream(droppedItem.toString().concat(".pdf"));
 		}
 		
 		if(droppedItem instanceof Video)
@@ -317,38 +330,36 @@ public class UploadViewController extends Thread
 		long threadId = Thread.currentThread().getId();
 		System.out.println("Thread # " + threadId + " is doing this task");*/
 
-    	OutputStream outputStream = Main.getClient().storeFileStream(droppedItem.toString().concat(".pdf"));
-
     	byte[] bytesIn = new byte[(int) file.length()];
     	length = bytesIn.length;
     	read = 0;
     	
-    	byte [] bytes = new byte[1024];
+    	byte [] bytes = new byte[512];
     	
     	while ((read = inputStream.read(bytes)) != -1)
     	{
     		currentRead += read;
     		//System.out.println("The file size: " + length + " Our pos in the fd: " + currentRead + " Our offset: " + offSet + " Our read: " + read);
     		Platform.runLater(new Runnable(){
-    			private volatile boolean shutdown;
-    			
-    			public void shutdown()
-    			{
-    				shutdown = true;
-    			}
     			
     			@Override
     			public void run()
     			{
-    				while(!shutdown)
-    				{
-    					/*get the TOTAL progress...*/
-	    				currentUploadLabel.setText(droppedItem.toString());
-	    				totalUploadProgressBar.setProgress((double)uploading/droppedItems.size());
-	    				currentUploadProgressBar.setProgress((double)currentRead/length);
-	    				shutdown();
-    				}
+    				/* This was to dynamically set the label for the current upload.
+    				 * It looked ugly otherwise.
+    				 */
+    				currentUploadLabel.setVisible(true);
+    				currentUploadProgressBar.setVisible(true);
+    				currentUploadLabel.setMinWidth(Region.USE_PREF_SIZE);
+    				double labelMiddle = currentUploadLabel.getWidth()/2;
+    				double barMiddle = currentUploadProgressBar.getWidth()/2;
+    				currentUploadLabel.setLayoutX(currentUploadProgressBar.getLayoutX() - labelMiddle + barMiddle);
     				
+	    			currentUploadLabel.setText("UPLOADING: " + droppedItem.toString());
+	    			currentUploadProgressBar.setProgress((double)currentRead/length);
+	    			
+	    			if(droppedItems.size() > 1)
+	    				totalUploadProgressBar.setProgress((double)uploading/droppedItems.size());
     			}});
     		outputStream.write(bytes, 0, read);
     		outputStream.flush();
@@ -368,7 +379,11 @@ public class UploadViewController extends Thread
 				@Override
 				public void run()
 				{
-					dialog.close();
+					//dialog.close();
+					currentUploadLabel.setVisible(false);
+					totalUploadLabel.setVisible(false);
+					currentUploadProgressBar.setVisible(false);
+					totalUploadProgressBar.setVisible(false);
 				}});
     	}
 	}
@@ -410,6 +425,10 @@ public class UploadViewController extends Thread
 	
 	public void start(Stage stage) throws IOException
 	{
+		this.totalUploadLabel.setVisible(false);
+		this.currentUploadLabel.setVisible(false);
+		this.totalUploadProgressBar.setVisible(false);
+		this.currentUploadProgressBar.setVisible(false);
 		UploadViewController.stage = stage;
 		stage.setTitle("File Upload");
 		Main.getClient().setFileType(FTP.BINARY_FILE_TYPE);
